@@ -30,19 +30,23 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"helm.sh/helm/v3/pkg/getter"
 	"helm.sh/helm/v3/pkg/repo"
 	"sigs.k8s.io/yaml"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/fluxcd/pkg/version"
-
 	"github.com/fluxcd/source-controller/internal/helm"
 	transport "github.com/fluxcd/source-controller/internal/helm/getter"
+	gcache "github.com/patrickmn/go-cache"
 )
 
-var ErrNoChartIndex = errors.New("no chart index")
+var (
+	cache           = gcache.New(5*time.Minute, 10*time.Minute)
+	ErrNoChartIndex = errors.New("no chart index")
+)
 
 // ChartRepository represents a Helm chart repository, and the configuration
 // required to download the chart index and charts from the repository.
@@ -230,7 +234,13 @@ func (r *ChartRepository) LoadIndexFromBytes(b []byte) error {
 	i := &repo.IndexFile{}
 	sha := fmt.Sprintf("%x", sha256.Sum256(b))
 
-	// dont re-marshal if the index hasnt changed
+	// Don't re-marshal if the index hasn't changed
+	cachedindex, found := cache.Get(sha)
+	if found {
+		r.Index = cachedindex.(*repo.IndexFile)
+		return nil
+	}
+
 	if r.Checksum == sha && r.Index != nil {
 		return nil
 	}
@@ -243,6 +253,7 @@ func (r *ChartRepository) LoadIndexFromBytes(b []byte) error {
 		return repo.ErrNoAPIVersion
 	}
 	i.SortEntries()
+	cache.Set(sha, i, gcache.DefaultExpiration)
 	r.Lock()
 	r.Index = i
 	r.Checksum = sha

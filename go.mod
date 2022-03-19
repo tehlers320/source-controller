@@ -76,6 +76,8 @@ replace github.com/opencontainers/image-spec => github.com/opencontainers/image-
 // Fix CVE-2021-43816
 replace github.com/containerd/containerd => github.com/containerd/containerd v1.6.1
 
+require github.com/patrickmn/go-cache v2.1.0+incompatible
+
 require (
 	cloud.google.com/go v0.100.2 // indirect
 	cloud.google.com/go/compute v1.5.0 // indirect
